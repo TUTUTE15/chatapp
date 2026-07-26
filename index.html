@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FAF7F2">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Messages</title>
+<style>
+/* =============================================================
+   Palette taken from a reading test with her, not from WCAG.
+   The measured ratio turned out to predict nothing: white on
+   midnight blue reads 16.4:1 and she could not read it at all,
+   while black on moss reads 6.2:1 and she read it easily. Every
+   light-on-dark pair failed or slowed her, at every ratio. So
+   there is no white text anywhere in this interface.
+   Pure off-white also only scored "slow" at 19.1:1 while softer
+   tints scored "easy", so the page is tinted rather than bright:
+   glare is costing her as much as contrast.
+============================================================= */
+:root{
+  --paper:#F0E8DE;   /* 17.3:1 with black, tinted to cut glare   */
+  --ink:#000000;     /* the exact black she was tested on        */
+  --muted:#4A423A;
+  --line:#CDC0AE;
+  --them:#FFFFFF;    /* white,      21.0:1  black text          */
+  --mine:#DCF8C6;    /* light green,18.3:1  black text          */
+  --tap:#E2D8C9;
+  --call:#7CB342;    /* mid green,   8.4:1  "read easily"        */
+  --write:#C9A227;   /* mustard,     8.7:1  "read easily"        */
+  --next:#C4C4C4;    /* silver,     12.0:1                       */
+  --leave:#D98B6A;   /* terracotta,  7.9:1  "read easily"        */
+  --new:#F2E3B0;     /* pale mustard, 16.4:1                     */
+  --newdot:#C9A227;
+  --danger:#8C2015;  /* admin only, never shown to her           */
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--paper);color:var(--ink);height:100dvh;
+  -webkit-user-select:none;user-select:none;
+  display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+:focus-visible{outline:5px solid var(--write);outline-offset:3px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.screen{display:none;flex:1;flex-direction:column;min-height:0}
+.screen.on{display:flex}
+
+/* --------------------------- HOME --------------------------- */
+#home{position:relative}
+.person{
+  flex:1;display:flex;align-items:center;gap:clamp(10px,2.6vw,22px);
+  padding:0 clamp(12px,3vw,32px);min-height:0;
+  border-bottom:2px solid var(--line);transition:background .1s;
+}
+.person:last-child{border-bottom:none}
+.person:active{background:var(--tap)}
+.face{
+  flex:none;border-radius:50%;
+  width:clamp(44px,8.2vh,84px);height:clamp(44px,8.2vh,84px);
+  display:grid;place-items:center;color:var(--ink);font-weight:700;
+  font-size:clamp(18px,3.4vh,34px);background-size:cover;background-position:center;
+  /* the ring is what makes a pale face visible at all: several of
+     her best-read colours sit at almost the same lightness as the
+     page, so the fill alone gives no edge */
+  border:3px solid var(--ink);
+}
+.pair{flex:none;position:relative;width:clamp(72px,13.4vh,138px);height:clamp(44px,8.2vh,84px)}
+.pair .face{position:absolute;top:0}
+.pair .face:first-child{left:0;z-index:2;box-shadow:0 0 0 6px var(--paper)}
+.pair .face:last-child{right:0}
+.person .name{
+  flex:1;min-width:0;align-self:stretch;overflow:hidden;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  gap:clamp(3px,0.7vh,8px);
+  font-weight:700;line-height:1;
+}
+/* She saw the colour change and missed the words entirely, which
+   means the badge was decoration rather than information. It is now
+   about the size of a button label. */
+.person .unread{
+  font-size:clamp(28px,4.3vh,42px);font-weight:700;line-height:1.1;
+  color:var(--ink);background:var(--newdot);
+  border:3px solid rgba(0,0,0,.3);border-radius:12px;
+  padding:clamp(6px,1vh,11px) clamp(12px,2.6vw,20px);
+}
+.person .name .lbl{text-align:left}
+/* No avatars. The circles were competing with the names for the
+   same row, and the name is what she actually reads. The header
+   band still carries each person's colour, and the new-messages
+   row still says the count in words, so nothing is lost with them
+   gone. */
+.face,.pair{display:none}
+.person.isnew{background:var(--new)}
+.person.isnew:active{background:#E9D79B}
+/* the way in to the admin screen: invisible, in the corner, and it
+   takes a four second hold. She will never find it by accident. */
+#adminZone{position:absolute;top:0;right:0;width:64px;height:64px;z-index:5}
+
+/* -------------------------- HEADER --------------------------
+   Who she is talking to is the biggest thing on every screen, in
+   the same place every time. The band underneath carries that
+   person's colour, the same colour as their face on the home
+   screen. Nothing else is in the header. */
+.head{
+  flex:none;display:flex;align-items:center;gap:clamp(13px,3.2vw,26px);
+  padding:clamp(13px,2.4vh,24px) clamp(18px,4.5vw,48px);
+  border-bottom:10px solid var(--line);   /* the colour band is now
+     the only thing carrying who she is talking to, so it is wider */
+}
+.head .face{width:clamp(50px,8.4vh,80px);height:clamp(50px,8.4vh,80px);font-size:clamp(20px,3.8vh,33px)}
+/* the name and the call button share this row, so the name gives
+   way: it is repeated on the button anyway */
+.head h1{font-size:clamp(24px,4.1vh,40px);font-weight:700;line-height:1.05;
+  letter-spacing:-.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head .count{margin-left:auto;font-size:clamp(16px,2.4vh,23px);color:var(--muted);font-weight:600;white-space:nowrap;padding-left:10px}
+/* Calling lives beside the name rather than in the button stack.
+   It is an action on this person, not a step in a flow, and the
+   stack below is for what she does next. */
+.callbtn{
+  margin-left:auto;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  height:clamp(76px,11.5vh,124px);min-width:clamp(210px,48vw,360px);max-width:62%;
+  padding:0 clamp(8px,2vw,16px);
+  background:var(--call);color:var(--ink);font-weight:700;
+  border:3px solid rgba(0,0,0,.16);border-radius:18px;
+  transition:transform .09s;
+}
+.callbtn:active{transform:scale(.98)}
+.callbtn.hidden{display:none}
+
+/* ------------------------ CONVERSATION ---------------------- */
+/* ------------------------ CONVERSATION -----------------------
+   History scrolls. It opens at the newest message, and a flick
+   goes back through everything: no paging button, nothing to
+   understand. Spacing is tight so the screen holds as many
+   messages as it can, and a run from one speaker closes up into a
+   block rather than sitting as separate islands. */
+.convo{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 clamp(18px,4.5vw,48px)}
+.thread{
+  flex:1;min-height:0;overflow-y:auto;
+  display:flex;flex-direction:column;
+  padding-bottom:clamp(10px,1.8vh,18px);overscroll-behavior:contain;
+  touch-action:none;              /* scrolling is handled below */
+}
+/* short conversations still sit at the bottom, and it still scrolls */
+.thread::before{content:"";margin-top:auto}
+#gauge{position:absolute;left:-99999px;top:0;visibility:hidden;display:flex;flex-direction:column}
+.turn{display:flex;flex-direction:column;max-width:88%;margin-top:clamp(10px,1.6vh,15px)}
+.turn.cont{margin-top:clamp(3px,0.5vh,5px)}
+.turn.mine{align-self:flex-end;align-items:flex-end}
+.turn.theirs{align-self:flex-start;align-items:flex-start}
+.who{font-size:clamp(24px,3.5vh,34px);font-weight:700;color:var(--ink);margin-bottom:6px;padding:0 6px}
+.bubble{
+  font-size:clamp(24px,3.7vh,35px);line-height:1.32;font-weight:500;
+  padding:clamp(11px,1.7vh,17px) clamp(16px,2.7vw,22px);
+  border-radius:18px;overflow-wrap:break-word;
+}
+/* Both bubbles are much lighter than the page, so they need a firm
+   edge or they read as holes rather than as objects. */
+.turn.theirs .bubble{background:var(--them);border:2px solid rgba(0,0,0,.30);border-bottom-left-radius:6px}
+.turn.mine   .bubble{background:var(--mine);border:2px solid rgba(0,0,0,.30);border-bottom-right-radius:6px}
+.bubble img{display:block;max-width:100%;max-height:30vh;object-fit:contain;border-radius:12px}
+.empty{color:var(--muted);font-size:clamp(21px,3.3vh,31px);align-self:center;padding-bottom:24px}
+
+/* --------------- NEW MESSAGES: grouped, then a break --------- */
+.msgArea{flex:1;min-height:0;overflow:hidden;padding:clamp(14px,2.6vh,28px) clamp(18px,4.5vw,48px);display:flex;align-items:flex-start}
+.stack{display:flex;flex-direction:column;gap:clamp(12px,2vh,19px);width:100%}
+
+/* -------------------------- ACTIONS ------------------------- */
+.choices{flex:none;display:flex;flex-direction:column;gap:clamp(8px,1.4vh,13px);padding:0 clamp(18px,4.5vw,48px) clamp(8px,1.4vh,13px)}
+/* A button is a fixed box and the words are grown to fill it, so
+   the type is as large as that button can physically carry. Short
+   labels end up bigger than long ones, which is the right way
+   round: the words that matter most are the ones with room. */
+.big{
+  display:flex;align-items:center;justify-content:center;
+  height:clamp(86px,13.2vh,146px);
+  border-radius:20px;color:var(--ink);text-align:center;
+  padding:0 clamp(6px,1.6vw,14px);
+  font-weight:700;transition:transform .09s;
+  border:3px solid rgba(0,0,0,.16);
+}
+.lbl{display:block;width:100%;text-align:center;line-height:1.02}
+.big:active{transform:scale(.98)}
+.big.call{background:var(--call)}
+.big.write{background:var(--write)}
+.big.next{background:var(--next)}
+.big.hidden{display:none}
+
+/* --------------------------- WRITE -------------------------- */
+.quote{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(10px,2vh,20px) clamp(18px,4.5vw,48px) 0}
+.quote .who{font-size:clamp(17px,2.5vh,23px)}
+.quote .bubble{font-size:clamp(18px,2.7vh,25px);line-height:1.35;padding:clamp(10px,1.5vh,15px) clamp(14px,2.3vw,19px);border-radius:16px}
+.quote .bubble img{max-height:16vh}
+.composer{flex:none;display:flex;flex-direction:column;gap:clamp(10px,1.8vh,17px);padding:clamp(12px,2.2vh,22px) clamp(18px,4.5vw,48px)}
+.composer textarea{
+  flex:none;height:clamp(100px,15vh,152px);font:inherit;
+  font-size:clamp(23px,3.7vh,35px);line-height:1.4;font-weight:450;
+  border:3px solid var(--line);border-radius:18px;padding:16px 20px;
+  resize:none;background:#fff;color:var(--ink);overflow:hidden;
+  -webkit-user-select:text;user-select:text;
+}
+.composer textarea::placeholder{color:var(--muted);opacity:1}
+.composer textarea:focus{border-color:var(--write);outline:none}
+.acts{flex:none;display:flex;gap:12px}
+.acts button{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  height:clamp(86px,13.2vh,146px);
+  border-radius:20px;color:var(--ink);text-align:center;padding:0 clamp(6px,1.6vw,14px);
+  font-weight:700;transition:transform .09s;border:3px solid rgba(0,0,0,.16);
+}
+.acts button:active{transform:scale(.98)}
+.acts .go{background:var(--write)}
+.acts .go[aria-disabled="true"]{background:var(--paper);color:var(--muted);border-style:dashed}
+
+/* ------------- WHEN THE KEYBOARD IS UP ----------------------
+   dvh is not reliable on Android once the keyboard opens, so the
+   height is pinned to the visible viewport in script. Everything
+   on the writing screen then gives up a little room, because the
+   red button going off the bottom edge would leave her typing with
+   no visible way out. */
+body.kb .head{padding-top:8px;padding-bottom:8px;border-bottom-width:4px}
+body.kb .head .face{width:clamp(34px,6vh,50px);height:clamp(34px,6vh,50px);font-size:clamp(14px,2.6vh,22px)}
+body.kb .head h1{font-size:clamp(20px,3.6vh,32px)}
+body.kb .composer{gap:8px;padding-top:8px;padding-bottom:8px}
+body.kb .composer textarea{height:clamp(56px,9.5vh,96px)}
+body.kb .acts button{height:clamp(54px,8.6vh,86px)}
+body.kb .back{height:clamp(52px,8.2vh,82px);margin-bottom:clamp(8px,1.4vh,14px)}
+body.kb .quote{padding-top:6px}
+
+/* --------------------- PERSISTENT ESCAPE --------------------
+   The same shape as every other button, so it is pressed the same
+   way, and red so it is never confused with one: green calls, blue
+   writes, grey moves on, red leaves. Sits off the bottom edge with
+   the same margin as the actions above it, which keeps it clear of
+   the phone's own gesture bar. 9.0:1 contrast. */
+.back{
+  flex:none;width:auto;
+  display:flex;align-items:center;justify-content:center;
+  height:clamp(82px,12.6vh,138px);
+  margin:0 clamp(18px,4.5vw,48px) clamp(13px,2.2vh,22px);
+  background:var(--leave);color:var(--ink);border-radius:20px;
+  border:3px solid rgba(0,0,0,.16);
+  padding:0 clamp(9px,2.2vw,18px);text-align:center;
+  font-weight:700;transition:transform .09s;
+}
+.back:active{transform:scale(.98);background:#C97A58}
+
+/* ============================ ADMIN =========================
+   Arthur's screen, not hers. Ordinary density, ordinary controls,
+   scrolling allowed. None of the constraints above apply here.
+============================================================= */
+#admin{background:#fff}
+.aBar{flex:none;display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:2px solid var(--line);background:var(--paper)}
+.aBar h2{font-size:19px;font-weight:700;flex:1}
+.aBar button{font-size:15px;font-weight:600;padding:9px 15px;border-radius:9px;background:var(--next);color:#000}
+#aReset{color:#fff}
+.aBody{flex:1;min-height:0;overflow-y:auto;padding:14px 18px 30px;-webkit-user-select:text;user-select:text}
+.aRow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.aRow .dot{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#000;font-weight:700;font-size:14px;border:1px solid rgba(0,0,0,.2)}
+.aRow .info{flex:1;min-width:0}
+.aRow .info b{display:block;font-size:16px}
+.aRow .info span{font-size:13px;color:var(--muted);word-break:break-all}
+.aRow .mini{padding:8px 12px;border-radius:8px;background:var(--tap);font-size:14px;font-weight:600}
+.aRow .mini.del{background:var(--danger);color:#fff}
+.aAdd{margin-top:16px;width:100%;text-align:center;padding:14px;border-radius:11px;background:var(--write);color:#000;font-size:16px;font-weight:700}
+.aForm{margin-top:16px;padding:15px;border:2px solid var(--line);border-radius:12px;background:var(--paper)}
+.aForm label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:12px 0 5px}
+.aForm label:first-child{margin-top:0}
+.aForm input[type=text],.aForm input[type=tel]{
+  width:100%;font:inherit;font-size:16px;padding:11px 13px;
+  border:2px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);
+  -webkit-user-select:text;user-select:text;
+}
+.swatches{display:flex;gap:9px;flex-wrap:wrap}
+.sw{width:38px;height:38px;border-radius:50%;border:3px solid transparent}
+.sw[aria-pressed="true"]{border-color:var(--ink)}
+.members{display:flex;flex-direction:column;gap:7px}
+.members label{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:500;color:var(--ink);margin:0}
+.members input{width:19px;height:19px}
+.aForm .row{display:flex;gap:9px;margin-top:16px}
+.aForm .row button{flex:1;padding:13px;border-radius:9px;font-size:15px;font-weight:700;text-align:center;color:#000}
+.aForm .row .save{background:var(--call)}
+.aForm .row .cancel{background:var(--next)}
+.aNote{margin-top:18px;font-size:13px;line-height:1.5;color:var(--muted)}
+.aTabs{display:flex;gap:9px;margin-bottom:14px}
+.aTabs button{flex:1;text-align:center;padding:11px;border-radius:9px;background:var(--tap);font-size:14px;font-weight:600}
+.aTabs button[aria-pressed="true"]{background:var(--write);color:#000}
+.tokL{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:0 0 5px}
+.tokI{width:100%;font:inherit;font-size:15px;padding:11px 13px;border:2px solid var(--line);
+      border-radius:9px;background:#fff;color:var(--ink);margin-bottom:12px;
+      -webkit-user-select:text;user-select:text}
+.aState{font-size:13px;font-weight:700;color:var(--muted);padding:9px 12px;border-radius:8px;
+        background:var(--tap);margin-bottom:16px}
+.aRow .mini.test{background:var(--call);color:#000}
+</style>
+</head>
+<body>
+
+<div id="gauge" aria-hidden="true"></div>
+
+<!-- ============================ HOME ========================== -->
+<section id="home" class="screen on" aria-label="Accueil">
+  <div id="adminZone" aria-hidden="true"></div>
+  <!-- rows are built from the saved list of people -->
+</section>
+
+<!-- ===================== NEW MESSAGES QUEUE =================== -->
+<section id="unread" class="screen" aria-label="Nouveaux messages">
+  <div class="head">
+    <span class="face" id="uFace" aria-hidden="true"></span>
+    <h1 id="uName"></h1>
+    <span class="count" id="uCount"></span>
+  </div>
+  <div class="msgArea" id="uArea"><div class="stack" id="uStack" aria-live="polite"></div></div>
+  <div class="choices">
+    <button class="big write" id="uReply"><span class="lbl"></span></button>
+    <button class="big next" id="uNext"><span class="lbl">Suivant</span></button>
+  </div>
+  <button class="back" data-home><span class="lbl">Contacter quelqu'un d'autre</span></button>
+</section>
+
+<!-- ============== CONTACT: conversation + actions ============= -->
+<section id="contact" class="screen" aria-label="Conversation">
+  <div class="head">
+    <span class="face" id="cFace" aria-hidden="true"></span>
+    <h1 id="cName"></h1>
+    <button class="callbtn" id="btnCall"><span class="lbl">Appeler</span></button>
+  </div>
+  <div class="convo">
+    <div class="thread" id="cThread" aria-live="polite"></div>
+  </div>
+  <div class="choices" id="cChoices">
+    <button class="big write" id="btnWrite"><span class="lbl"></span></button>
+  </div>
+  <button class="back" data-home><span class="lbl">Contacter quelqu'un d'autre</span></button>
+</section>
+
+<!-- ========================== WRITE =========================== -->
+<section id="write" class="screen" aria-label="Écrire un message">
+  <div class="head">
+    <span class="face" id="wFace" aria-hidden="true"></span>
+    <h1 id="wName"></h1>
+  </div>
+  <div class="quote" id="wQuote"></div>
+  <div class="composer">
+    <textarea id="txt" placeholder="Votre message" aria-label="Votre message"
+              maxlength="220" autocapitalize="sentences" autocorrect="on" spellcheck="true"
+              enterkeyhint="done"></textarea>
+    <div class="acts">
+      <button class="go" id="send" aria-disabled="true"><span class="lbl">Envoyer</span></button>
+    </div>
+  </div>
+  <button class="back" data-home><span class="lbl">Contacter quelqu'un d'autre</span></button>
+</section>
+
+<!-- ==================== ADMIN (Arthur only) =================== -->
+<section id="admin" class="screen" aria-label="Réglages">
+  <div class="aBar">
+    <h2>Contacts</h2>
+    <button id="aWipe">Vider</button>
+    <button id="aReset" style="background:var(--danger)">Tout effacer</button>
+    <button id="aClose">Fermer</button>
+  </div>
+  <div class="aBody">
+    <label class="tokL" for="fToken">Jeton du bot (BotFather)</label>
+    <input class="tokI" id="fToken" type="text" placeholder="123456:ABC-DEF...">
+    <div class="aState" id="aState">…</div>
+    <div id="aList"></div>
+    <button class="aAdd" id="aAdd">Ajouter</button>
+    <div id="aFormWrap"></div>
+    <p class="aNote">
+      Les personnes apparaissent dans cet ordre sur l'écran d'accueil.
+      Cinq entrées au maximum restent confortables à lire.
+      Un groupe n'a pas de bouton d'appel : un groupe n'a pas de numéro.
+      Un vrai groupe Telegram : tout le monde y voit les réponses de tout le monde.
+      Le chat ID s'obtient via api.telegram.org/bot&lt;jeton&gt;/getUpdates.
+    </p>
+  </div>
+</section>
+
+<script>
+/* =============================================================
+   CONFIG
+   Editable from the admin screen, saved through the Android
+   bridge. This default is only used the very first time.
+   numbers.length === 1  ->  a person, gets a call button
+   numbers.length  >  1  ->  a group,  no call button
+============================================================= */
+/* only pairs she read easily, all with black text */
+const SWATCHES = ["#FADCDC","#E6DCF7","#C4C4C4","#C9A227","#7CB342","#D98B6A","#7D9455"];
+
+const DEFAULT_CONFIG = {
+  botToken:"",                       /* from BotFather */
+  people:[
+    /* chatId empty = shown to her, but goes nowhere yet. Fill one
+       in when that person is actually on Telegram. */
+    { id:"p1", name:"Sophie", chatId:"", numbers:[], colour:"#FADCDC",
+      photo:null, transport:"telegram", canCall:false },
+    { id:"p2", name:"Karine", chatId:"", numbers:[], colour:"#7D9455",
+      photo:null, transport:"telegram", canCall:false },
+    { id:"p3", name:"Arthur", chatId:"", numbers:[], colour:"#D98B6A",
+      photo:null, transport:"telegram", canCall:false },
+    { id:"g1", name:"Sophie et Karine", chatId:"", colour:"#FADCDC",
+      photo:null, transport:"telegram", members:["p1","p2"], numbers:[] }
+  ]};
+
+const MAX_CHARS = 220, STEP_BACK = 2;
+
+let CONFIG = loadConfig();
+const inbox = {};                       /* id -> messages, oldest first */
+
+let current = null;
+let queue = [], qi = 0, returnTo = "contact";
+
+/* Android shell if there is one, browser storage otherwise, memory
+   if even that is blocked. Never throws, so it degrades quietly
+   rather than taking the app down with it. */
+const MEM = {};
+function readKey(k){
+  try{ if(window.Android && window.Android.loadConfig && k === "cfg") return window.Android.loadConfig(); }catch(e){}
+  try{ if(window.Android && window.Android.loadHistory && k === "hist") return window.Android.loadHistory(); }catch(e){}
+  try{ const v = window.localStorage.getItem("mam_"+k); if(v !== null) return v; }catch(e){}
+  return MEM[k] || null;
+}
+function writeKey(k, v){
+  try{ if(window.Android && window.Android.saveConfig && k === "cfg"){ window.Android.saveConfig(v); return; } }catch(e){}
+  try{ if(window.Android && window.Android.saveHistory && k === "hist"){ window.Android.saveHistory(v); return; } }catch(e){}
+  try{ window.localStorage.setItem("mam_"+k, v); return; }catch(e){}
+  MEM[k] = v;
+}
+
+function loadConfig(){
+  try{ const raw = readKey("cfg"); if(raw) return JSON.parse(raw); }catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}
+function saveConfig(){ try{ writeKey("cfg", JSON.stringify(CONFIG)); }catch(e){} }
+function person(id){ return CONFIG.people.find(p=>p.id === id); }
+function isGroup(p){ return !!(p.members && p.members.length); }
+function initials(name){
+  return name.split(/\s+/).filter(w=>!/^(et|and|&)$/i.test(w))
+             .map(w=>w[0]).join("").slice(0,2).toUpperCase();
+}
+CONFIG.people.forEach(p=>{ if(!inbox[p.id]) inbox[p.id] = []; });
+
+/* ==================== TYPE THAT FILLS ITS BOX ===============
+   Each button is a fixed height, and its words are grown until they
+   just fit it. A short label like "Suivant" ends up considerably
+   larger than "Contacter quelqu'un d'autre", which is correct: the
+   box is the constraint, not a number chosen in advance. Long
+   labels are allowed a second line rather than being shrunk into
+   illegibility for the sake of staying on one.
+============================================================= */
+function fitButton(btn){
+  const lbl = btn.querySelector(".lbl"); if(!lbl) return;
+  const cs = getComputedStyle(btn);
+  const availW = btn.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const availH = btn.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom);
+  if(availW <= 0 || availH <= 0) return;
+
+  const MAX = 128, MIN = 16;
+  const tooBig = ()=> lbl.scrollWidth > availW + 0.5 || lbl.scrollHeight > availH + 0.5;
+
+  const run = (wrap)=>{
+    lbl.style.whiteSpace = wrap ? "normal" : "nowrap";
+    let size = MAX;
+    lbl.style.fontSize = size + "px";
+    while(size > MIN && tooBig()){ size -= 1; lbl.style.fontSize = size + "px"; }
+    return size;
+  };
+
+  /* try it both ways and keep whichever comes out larger. A long
+     label is usually bigger across two lines than squeezed onto
+     one; a short one is bigger on a single line. No guessing. */
+  const oneLine = run(false);
+  const wrapped = run(true);
+  if(oneLine >= wrapped) run(false);
+}
+
+function fitVisibleButtons(){
+  document.querySelectorAll(".screen.on .big, .screen.on .back, .screen.on .acts button, .screen.on .callbtn")
+          .forEach(fitButton);
+  /* home names are grown the same way, against the space the row
+     actually leaves them once the face has taken its share */
+  document.querySelectorAll("#home.on .person .name").forEach(fitName);
+}
+
+function fitName(nameEl){
+  const lbl = nameEl.querySelector(".lbl"); if(!lbl) return;
+  const row = nameEl.closest(".person");
+  const availW = nameEl.clientWidth;
+  /* measured from the row, because .name hugs its own text: taking
+     the height from .name means fitting the text inside itself, and
+     it simply converges on the size it already was */
+  const badge = nameEl.querySelector(".unread");
+  const availH = (row ? row.clientHeight : nameEl.clientHeight) * 0.82
+                 - (badge ? badge.offsetHeight + 10 : 0);
+  if(availW <= 0 || availH <= 0) return;
+  const MAX = 168, MIN = 18;
+  const tooBig = ()=> lbl.scrollWidth > availW + 0.5 || lbl.scrollHeight > availH + 0.5;
+  const run = (wrap)=>{
+    lbl.style.whiteSpace = wrap ? "normal" : "nowrap";
+    let size = MAX; lbl.style.fontSize = size + "px";
+    while(size > MIN && tooBig()){ size -= 1; lbl.style.fontSize = size + "px"; }
+    return size;
+  };
+  const one = run(false), two = run(true);
+  if(one >= two) run(false);
+}
+
+/* --------------------------- ROUTING ------------------------ */
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.toggle("on", s.id===id));
+  requestAnimationFrame(fitVisibleButtons);
+}
+
+/* labels are set through here so the type is always refitted to
+   whatever the new words need */
+function setLabel(btn, text){
+  const lbl = btn.querySelector(".lbl");
+  if(lbl) lbl.textContent = text; else btn.textContent = text;
+  fitButton(btn);
+}
+function paintFace(el,p){
+  el.textContent = p.photo ? "" : initials(p.name);
+  el.style.background = p.photo ? "url("+p.photo+") center/cover" : p.colour;
+}
+function setHeader(faceEl, nameEl, p){
+  paintFace(faceEl, p);
+  nameEl.textContent = p.name;
+  faceEl.closest(".head").style.borderBottomColor = p.colour;
+}
+function unreadOf(id){ return (inbox[id]||[]).filter(m=>!m.mine && !m.read); }
+
+function goHome(){
+  current = null; queue = []; qi = 0;
+  clearDraft(); renderHome(); show("home");
+}
+
+/* ------------------------ HOME, BUILT ----------------------- */
+const home = document.getElementById("home");
+
+function renderHome(){
+  [...home.querySelectorAll(".person")].forEach(n=>n.remove());
+
+  CONFIG.people.forEach(p=>{
+    const b = document.createElement("button");
+    b.className = "person";
+
+    if(p.members && p.members.length === 2 && person(p.members[0]) && person(p.members[1])){
+      const a = person(p.members[0]), c = person(p.members[1]);
+      b.innerHTML = '<span class="pair" aria-hidden="true">' +
+        '<span class="face" style="background:'+a.colour+'">'+initials(a.name)+'</span>' +
+        '<span class="face" style="background:'+c.colour+'">'+initials(c.name)+'</span></span>';
+    }else{
+      const f = document.createElement("span");
+      f.className = "face"; f.setAttribute("aria-hidden","true");
+      paintFace(f, p); b.appendChild(f);
+    }
+    const nm = document.createElement("span");
+    nm.className = "name";
+    const nlbl = document.createElement("span");
+    nlbl.className = "lbl";
+    nlbl.textContent = p.name;
+    nm.appendChild(nlbl);
+
+    /* the count sits on the person it belongs to, rather than in a
+       separate row she has to connect back to a name */
+    const u = unreadOf(p.id).length;
+    if(u){
+      b.classList.add("isnew");
+      const un = document.createElement("span");
+      un.className = "unread";
+      un.textContent = u === 1 ? "1 message non lu" : u + " messages non lus";
+      nm.appendChild(un);
+    }
+    b.appendChild(nm);
+    b.addEventListener("click", ()=>openContact(p.id));
+    home.appendChild(b);
+  });
+  requestAnimationFrame(fitVisibleButtons);
+}
+
+document.querySelectorAll("[data-home]").forEach(b=>b.addEventListener("click", goHome));
+
+/* ================= ALWAYS RESET TO HOME ==================== */
+document.addEventListener("visibilitychange",()=>{ if(document.hidden && !onAdmin()) goHome(); });
+window.addEventListener("pagehide", ()=>{ if(!onAdmin()) goHome(); });
+function onAdmin(){ return document.getElementById("admin").classList.contains("on"); }
+/* No idle timeout. Reading a long message, or thinking about what
+   to write, is not a reason to be thrown back to the start: the
+   only thing that resets the app is leaving it. */
+
+/* ============ NOTHING OVERSIZED EVER ARRIVES =============== */
+function splitLong(text){
+  text = text.trim();
+  if(text.length <= MAX_CHARS) return [text];
+  const parts = text.match(/[^.!?…]+[.!?…]*\s*/g) || [text];
+  const out = []; let cur = "";
+  const flush = ()=>{ if(cur.trim()) out.push(cur.trim()); cur = ""; };
+  parts.forEach(p=>{
+    p = p.trim();
+    while(p.length > MAX_CHARS){
+      flush();
+      let cut = p.lastIndexOf(" ", MAX_CHARS);
+      if(cut < MAX_CHARS*0.5) cut = MAX_CHARS;
+      out.push(p.slice(0,cut).trim()); p = p.slice(cut).trim();
+    }
+    if((cur+" "+p).trim().length > MAX_CHARS) flush();
+    cur = (cur ? cur+" " : "") + p;
+  });
+  flush();
+  return out.length ? out : [text.slice(0,MAX_CHARS)];
+}
+
+/* ------------------------- WHEN ----------------------------- */
+const DAYS = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+function whenLabel(d){
+  const now = new Date();
+  const hm = String(d.getHours()).padStart(2,"0")+"h"+String(d.getMinutes()).padStart(2,"0");
+  const day = new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const diff = Math.round((today-day)/86400000);
+  if(diff === 0) return hm;
+  if(diff === 1) return "hier "+hm;
+  if(diff < 7)   return DAYS[d.getDay()]+" "+hm;
+  return "le "+d.getDate()+"/"+(d.getMonth()+1);
+}
+
+/* ===================== THE CONVERSATION ===================== */
+const cThread = document.getElementById("cThread");
+const gauge   = document.getElementById("gauge");
+const RECENT  = 300;   /* how far back to render at once */
+
+function makeTurn(m, name, prev){
+  const t = document.createElement("div");
+  t.className = "turn " + (m.mine ? "mine" : "theirs");
+  const w = document.createElement("div");
+  w.className = "who";
+  /* in a group the chat is not the speaker, so each message says who
+     it came from; elsewhere the header already answers that */
+  const speaker = m.mine ? "Vous" : (m.from || name);
+  const sameSpeaker = prev && prev.mine === m.mine &&
+                      (prev.from || null) === (m.from || null);
+  /* a run from one speaker is one thing they said: label the top of
+     it, then let the rest close up. A real pause starts a new run. */
+  const cont = sameSpeaker && (m.at - prev.at) < 900000;
+  if(cont) t.classList.add("cont");
+  /* who, in words, instead of a clock time. She reads a name far
+     faster than she decodes "hier 14h20", and the hour was never
+     the thing she wanted to know. */
+  w.textContent = cont ? "" : (m.mine ? "Vous avez écrit :" : speaker + " a écrit :");
+  if(cont) w.style.display = "none";
+  const b = document.createElement("div");
+  b.className = "bubble";
+  if(m.photo){ const i = document.createElement("img"); i.src = m.photo; i.alt = "Photo de "+speaker; b.appendChild(i); }
+  else b.textContent = m.text;
+  t.appendChild(w); t.appendChild(b);
+  return t;
+}
+function renderInto(el, msgs, name){
+  el.innerHTML = "";
+  msgs.forEach((m,i)=>el.appendChild(makeTurn(m, name, msgs[i-1])));
+}
+function renderConversation(id){
+  const all = inbox[id] || [], name = person(id).name;
+  cThread.innerHTML = "";
+  if(!all.length){
+    const p = document.createElement("p");
+    p.className = "empty"; p.textContent = "Pas encore de message.";
+    cThread.appendChild(p); return;
+  }
+  const msgs = all.slice(-RECENT);
+  renderInto(cThread, msgs, name);
+  cThread.scrollTop = cThread.scrollHeight;   /* open on the newest */
+  requestAnimationFrame(()=>{ cThread.scrollTop = cThread.scrollHeight; });
+}
+
+/* ==================== TELEGRAM, DIRECTLY ====================
+   The Bot API is ordinary HTTPS and allows cross-origin calls, so
+   the page can talk to it with no server and no native shell. This
+   is what makes a real, working test possible from a web page.
+   Its one limit is honest and important: polling only runs while
+   the app is open, so nothing arrives in the background. That is
+   fine for testing and not fine for living with.
+============================================================= */
+const TG = (function(){
+  let offset = 0, running = false, status = "en attente";
+  const api = m => "https://api.telegram.org/bot" + CONFIG.botToken + "/" + m;
+  const sleep = ms => new Promise(r=>setTimeout(r, ms));
+
+  async function send(chatId, text){
+    if(!CONFIG.botToken || !chatId) return;
+    try{
+      await fetch(api("sendMessage"), {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ chat_id:String(chatId), text:text })
+      });
+    }catch(e){ status = "envoi impossible"; }
+  }
+
+  async function photoUrl(fileId){
+    try{
+      const r = await fetch(api("getFile") + "?file_id=" + encodeURIComponent(fileId));
+      const j = await r.json();
+      if(j.ok) return "https://api.telegram.org/file/bot" + CONFIG.botToken + "/" + j.result.file_path;
+    }catch(e){}
+    return null;
+  }
+
+  function handle(u){
+    const m = u.message || u.edited_message || u.channel_post;
+    if(!m) return;
+    const chatId = String(m.chat.id);
+    const from = (m.from && (m.from.first_name || m.from.username)) || "";
+    if(m.text) window.deliverTo(chatId, from, m.text);
+    else if(m.photo && m.photo.length){
+      photoUrl(m.photo[m.photo.length-1].file_id)
+        .then(url=>{ if(url) window.deliverPhotoTo(chatId, from, url); });
+      if(m.caption) window.deliverTo(chatId, from, m.caption);
+    }
+  }
+
+  async function loop(){
+    if(running) return;
+    running = true;
+    while(running){
+      if(!CONFIG.botToken){ status = "jeton manquant"; await sleep(3000); continue; }
+      try{
+        const r = await fetch(api("getUpdates") + "?timeout=25&offset=" + offset);
+        const j = await r.json();
+        if(j.ok){
+          status = "connecté";
+          j.result.forEach(u=>{ offset = u.update_id + 1; handle(u); });
+        }else{
+          status = "erreur : " + (j.description || "?");
+          await sleep(5000);
+        }
+      }catch(e){
+        status = "hors ligne";
+        await sleep(4000);
+      }
+    }
+  }
+
+  return { send, start:loop, state:()=>status };
+})();
+
+/* the native shell does its own polling in a background service */
+if(!(window.Android && window.Android.sendTelegram)) TG.start();
+
+/* =============== SCROLLING THAT RESISTS ONE WAY =============
+   Going back in time is deliberately heavy: her finger has to
+   travel about three times the distance, and there is no momentum,
+   so a stray brush of the screen moves almost nothing. Coming back
+   to the newest message is one to one and a flick snaps all the way
+   down. Easy to return, hard to wander off by accident.
+============================================================= */
+const BACK_RESIST = 0.32;   /* toward older: heavy   */
+const FORWARD_GAIN = 1.0;   /* toward newest: normal */
+const SNAP_VELOCITY = 0.45; /* px per ms flick that returns to now */
+
+let dragging = false, lastY = 0, lastT = 0, vy = 0;
+
+function toBottom(smooth){
+  const opts = { top: cThread.scrollHeight };
+  if(smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches) opts.behavior = "smooth";
+  cThread.scrollTo(opts);
+}
+
+cThread.addEventListener("pointerdown", e=>{
+  dragging = true; lastY = e.clientY; lastT = performance.now(); vy = 0;
+  try{ cThread.setPointerCapture(e.pointerId); }catch(err){}
+});
+
+cThread.addEventListener("pointermove", e=>{
+  if(!dragging) return;
+  const now = performance.now();
+  const dy = e.clientY - lastY;
+  const dt = Math.max(1, now - lastT);
+  lastY = e.clientY; lastT = now;
+  vy = dy / dt;
+  /* dy > 0 means the finger is dragging downwards, which pulls
+     older messages into view: that is the direction to resist */
+  cThread.scrollTop -= dy * (dy > 0 ? BACK_RESIST : FORWARD_GAIN);
+  e.preventDefault();
+});
+
+["pointerup","pointercancel","pointerleave"].forEach(ev=>
+  cThread.addEventListener(ev, ()=>{
+    if(!dragging) return;
+    dragging = false;
+    /* a quick flick upwards means "take me back to now" */
+    if(vy < -SNAP_VELOCITY) toBottom(true);
+  }));
+
+/* same asymmetry for a mouse wheel, so it behaves in a browser too */
+cThread.addEventListener("wheel", e=>{
+  cThread.scrollTop += e.deltaY * (e.deltaY < 0 ? BACK_RESIST : FORWARD_GAIN);
+  e.preventDefault();
+}, { passive:false });
+
+/* --------------------- CONTACT (direct) --------------------- */
+function openContact(id){
+  current = id; returnTo = "contact";
+  const p = person(id);
+  setHeader(document.getElementById("cFace"), document.getElementById("cName"), p);
+
+  /* a group has no number of its own, so it has nothing to call.
+     someone abroad may be reachable but not affordably, so calling
+     is a per-person choice rather than an assumption. */
+  const call = document.getElementById("btnCall");
+  const callable = !isGroup(p) && p.canCall !== false;
+  call.classList.toggle("hidden", !callable);
+  if(callable) setLabel(call, "Appeler " + p.name);
+
+  /* writing can be switched off per person: someone she should only
+     ever ring, or an entry that has no chat behind it yet */
+  const write = document.getElementById("btnWrite");
+  const chattable = p.canChat !== false;
+  write.classList.toggle("hidden", !chattable);
+  if(chattable) setLabel(write, "Écrire à " + p.name);
+  document.getElementById("cChoices").style.display = chattable ? "" : "none";
+
+  show("contact");
+  renderConversation(id);
+  (inbox[id]||[]).forEach(m=>m.read = true);
+  renderHome();
+}
+document.getElementById("btnCall").addEventListener("click",()=>{ location.href = "tel:" + person(current).numbers[0]; });
+document.getElementById("btnWrite").addEventListener("click",()=>{ returnTo = "contact"; openWrite(); });
+
+/* ==================== THE NEW MESSAGES QUEUE ================ */
+const uArea = document.getElementById("uArea"), uStack = document.getElementById("uStack");
+
+function groupFits(msgs, name){
+  gauge.style.width = uStack.clientWidth + "px";
+  renderInto(gauge, msgs, name);
+  return gauge.getBoundingClientRect().height <= uArea.clientHeight;
+}
+function startQueue(){
+  const flat = [];
+  CONFIG.people.forEach(p=>{ unreadOf(p.id).forEach(m=>flat.push({ id:p.id, msg:m })); });
+  if(!flat.length){ goHome(); return; }
+  show("unread");
+  queue = [];
+  let i = 0;
+  while(i < flat.length){
+    const id = flat[i].id, name = person(id).name;
+    const group = [flat[i].msg];
+    let j = i+1;
+    while(j < flat.length && flat[j].id === id && groupFits(group.concat(flat[j].msg), name)){
+      group.push(flat[j].msg); j++;
+    }
+    queue.push({ id:id, msgs:group });
+    i = j;
+  }
+  qi = 0; showQueueStep();
+}
+function showQueueStep(){
+  if(qi >= queue.length){ goHome(); return; }
+  const step = queue[qi], p = person(step.id);
+  current = step.id;
+  setHeader(document.getElementById("uFace"), document.getElementById("uName"), p);
+  document.getElementById("uCount").textContent = queue.length > 1 ? (qi+1)+" sur "+queue.length : "";
+  const rep = document.getElementById("uReply");
+  const chattable = p.canChat !== false;
+  rep.classList.toggle("hidden", !chattable);
+  if(chattable) setLabel(rep, "Répondre à " + p.name);
+  show("unread");
+  renderInto(uStack, step.msgs, p.name);
+}
+function advance(){
+  queue[qi].msgs.forEach(m=>m.read = true);
+  qi++; renderHome(); showQueueStep();
+}
+document.getElementById("uNext").addEventListener("click", advance);
+document.getElementById("uReply").addEventListener("click", ()=>{ returnTo = "queue"; openWrite(); });
+
+/* ----------------------------- WRITE ------------------------ */
+const wQuote = document.getElementById("wQuote");
+function quotedMessage(){
+  if(returnTo === "queue" && queue[qi]){ const g = queue[qi].msgs; return g[g.length-1]; }
+  const msgs = inbox[current] || [];
+  return msgs.length ? msgs[msgs.length-1] : null;
+}
+function paintQuote(){
+  wQuote.innerHTML = "";
+  const m = quotedMessage(); if(!m) return;
+  wQuote.appendChild(makeTurn(m, person(current).name, null));
+  const b = wQuote.querySelector(".bubble");
+  let size = parseFloat(getComputedStyle(b).fontSize);
+  while(wQuote.scrollHeight > wQuote.clientHeight && size > 15){ size -= 1; b.style.fontSize = size+"px"; }
+}
+function openWrite(){
+  const p = person(current);
+  setHeader(document.getElementById("wFace"), document.getElementById("wName"), p);
+  /* the button names the destination, so the last thing she reads
+     before pressing is who it is going to. A group is already named
+     in the header and would not fit here anyway. */
+  setLabel(document.getElementById("send"), isGroup(p) ? "Envoyer" : "Envoyer à " + p.name);
+  show("write"); paintQuote();
+  document.getElementById("txt").focus();
+}
+
+const txt = document.getElementById("txt");
+const btnSend = document.getElementById("send");
+function syncButtons(){ btnSend.setAttribute("aria-disabled", txt.value.trim()==="" ? "true" : "false"); }
+function clearDraft(){ txt.value = ""; txt.blur(); syncButtons(); }
+txt.addEventListener("input", syncButtons);
+txt.addEventListener("keydown", e=>{ if(e.key === "Enter" && !e.shiftKey) e.preventDefault(); });
+
+btnSend.addEventListener("click", ()=>{
+  const b = txt.value.trim();
+  if(!b){ txt.focus(); return; }
+  const wasQueue = (returnTo === "queue");
+  sendTo(person(current), b);
+  inbox[current].push({ text:b, mine:true, at:Date.now(), read:true });
+  saveHistory();
+  clearDraft();
+  /* Always land in the conversation she just wrote to. Being thrown
+     onward to someone else's message the instant she replies is
+     disorienting: she has no idea where her own words went. */
+  if(wasQueue && queue[qi]){ queue[qi].msgs.forEach(m=>m.read = true); qi++; }
+  openContact(current);
+});
+/* ======================= ADMIN SCREEN =======================
+   Reached by holding the top-right corner of the home screen for
+   four seconds. Not a secret worth defending, just one she will
+   never trip over.
+============================================================= */
+const aList = document.getElementById("aList");
+const aFormWrap = document.getElementById("aFormWrap");
+let holdTimer = null;
+
+const zone = document.getElementById("adminZone");
+zone.addEventListener("pointerdown", ()=>{ holdTimer = setTimeout(openAdmin, 4000); });
+["pointerup","pointerleave","pointercancel"].forEach(e=>
+  zone.addEventListener(e, ()=>clearTimeout(holdTimer)));
+
+function openAdmin(){
+  show("admin");
+  document.getElementById("fToken").value = CONFIG.botToken || "";
+  renderAdmin();
+}
+setInterval(()=>{
+  const el = document.getElementById("aState");
+  if(el) el.textContent = "Telegram : " + TG.state();
+}, 1000);
+document.getElementById("fToken").addEventListener("input", e=>{
+  CONFIG.botToken = e.target.value.trim(); saveConfig();
+});
+document.getElementById("aClose").addEventListener("click", ()=>{ saveConfig(); goHome(); });
+
+/* clear the conversations but keep the token and the chat ids,
+   which is what you actually want between tests */
+document.getElementById("aWipe").addEventListener("click", ()=>{
+  if(!confirm("Vider toutes les conversations ? Les contacts sont gardés.")) return;
+  Object.keys(inbox).forEach(k=>{ inbox[k] = []; });
+  saveHistory(); renderHome();
+  const el = document.getElementById("aState");
+  if(el) el.textContent = "Conversations vidées";
+});
+
+/* wipe everything and start over: useful while testing, and the
+   only way back if a chat id gets attached to the wrong person */
+document.getElementById("aReset").addEventListener("click", ()=>{
+  if(!confirm("Effacer les contacts et tous les messages ?")) return;
+  try{ window.localStorage.removeItem("mam_cfg"); window.localStorage.removeItem("mam_hist"); }catch(e){}
+  CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  Object.keys(inbox).forEach(k=>delete inbox[k]);
+  CONFIG.people.forEach(p=>inbox[p.id] = []);
+  saveConfig(); saveHistory();
+  document.getElementById("fToken").value = "";
+  renderAdmin(); renderHome();
+});
+
+function renderAdmin(){
+  aFormWrap.innerHTML = "";
+  aList.innerHTML = "";
+  CONFIG.people.forEach((p, idx)=>{
+    const row = document.createElement("div");
+    row.className = "aRow";
+    row.innerHTML =
+      '<span class="dot" style="background:'+p.colour+'">'+initials(p.name)+'</span>' +
+      '<span class="info"><b>'+p.name+'</b><span>'+
+        (isGroup(p) ? "Groupe · " + (p.chatId || "chat ID manquant")
+                    : (p.transport === "sms" ? (p.numbers[0]||"?") + " · SMS"
+                                             : "Telegram " + (p.chatId || "?")) +
+                      (p.canCall === false ? " · sans appel" : "") +
+                      (p.canChat === false ? " · sans message" : "")) +'</span></span>';
+    const test = document.createElement("button");
+    test.className = "mini test"; test.textContent = "Test";
+    test.addEventListener("click", ()=>{
+      sendTo(p, "Test depuis l'application.");
+      test.textContent = "Envoyé";
+      setTimeout(()=>{ test.textContent = "Test"; }, 1500);
+    });
+    row.appendChild(test);
+
+    const edit = document.createElement("button");
+    edit.className = "mini"; edit.textContent = "Modifier";
+    edit.addEventListener("click", ()=>showForm(idx));
+    const del = document.createElement("button");
+    del.className = "mini del"; del.textContent = "Retirer";
+    del.addEventListener("click", ()=>{
+      CONFIG.people.splice(idx,1); saveConfig(); renderAdmin();
+    });
+    row.appendChild(edit); row.appendChild(del);
+    aList.appendChild(row);
+  });
+}
+
+document.getElementById("aAdd").addEventListener("click", ()=>showForm(-1));
+
+function showForm(idx){
+  const editing = idx >= 0;
+  const p = editing ? JSON.parse(JSON.stringify(CONFIG.people[idx]))
+                    : { id:"x"+Date.now(), name:"", numbers:[""], colour:SWATCHES[0], photo:null };
+  let mode = (p.members && p.members.length) ? "group" : "person";
+
+  aFormWrap.innerHTML = "";
+  const f = document.createElement("div");
+  f.className = "aForm";
+
+  const tabs = document.createElement("div");
+  tabs.className = "aTabs";
+  tabs.innerHTML = '<button data-m="person">Une personne</button><button data-m="group">Un groupe</button>';
+  f.appendChild(tabs);
+
+  const fields = document.createElement("div");
+  f.appendChild(fields);
+
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = '<button class="save">Enregistrer</button><button class="cancel">Annuler</button>';
+  f.appendChild(row);
+  aFormWrap.appendChild(f);
+
+  function paintTabs(){
+    tabs.querySelectorAll("button").forEach(b=>
+      b.setAttribute("aria-pressed", b.dataset.m === mode ? "true" : "false"));
+  }
+  tabs.querySelectorAll("button").forEach(b=>b.addEventListener("click", ()=>{
+    mode = b.dataset.m; paintTabs(); paintFields();
+  }));
+
+  function paintFields(){
+    fields.innerHTML = "";
+    const nameL = document.createElement("label"); nameL.textContent = "Nom";
+    const nameI = document.createElement("input");
+    nameI.type = "text"; nameI.value = p.name; nameI.id = "fName";
+    fields.appendChild(nameL); fields.appendChild(nameI);
+
+    if(mode === "person"){
+      const telL = document.createElement("label"); telL.textContent = "Numéro (format +32...)";
+      const telI = document.createElement("input");
+      telI.type = "tel"; telI.value = p.numbers[0] || ""; telI.id = "fTel";
+      fields.appendChild(telL); fields.appendChild(telI);
+
+      const cidL = document.createElement("label");
+      cidL.textContent = "Chat ID Telegram (voir getUpdates)";
+      const cidI = document.createElement("input");
+      cidI.type = "text"; cidI.value = p.chatId || ""; cidI.id = "fChat";
+      fields.appendChild(cidL); fields.appendChild(cidI);
+
+      const trL = document.createElement("label"); trL.textContent = "Par quel moyen";
+      const tr = document.createElement("div"); tr.className = "aTabs";
+      tr.innerHTML = '<button data-t="telegram">Telegram</button><button data-t="sms">SMS</button>';
+      const setTr = ()=>tr.querySelectorAll("button").forEach(b=>
+        b.setAttribute("aria-pressed", b.dataset.t === (p.transport||"telegram") ? "true":"false"));
+      tr.querySelectorAll("button").forEach(b=>b.addEventListener("click", ()=>{
+        p.transport = b.dataset.t; setTr(); setCall();
+      }));
+      setTr();
+      fields.appendChild(trL); fields.appendChild(tr);
+
+      const chL = document.createElement("label"); chL.textContent = "Écrire des messages";
+      const ch = document.createElement("div"); ch.className = "aTabs";
+      ch.innerHTML = '<button data-h="1">Oui</button><button data-h="0">Non</button>';
+      const setChat = ()=>ch.querySelectorAll("button").forEach(b=>
+        b.setAttribute("aria-pressed", (b.dataset.h === "1") === (p.canChat !== false) ? "true":"false"));
+      ch.querySelectorAll("button").forEach(b=>b.addEventListener("click", ()=>{
+        p.canChat = b.dataset.h === "1"; setChat();
+      }));
+      setChat();
+      fields.appendChild(chL); fields.appendChild(ch);
+
+      const cbL = document.createElement("label"); cbL.textContent = "Bouton Appeler";
+      const cb = document.createElement("div"); cb.className = "aTabs";
+      cb.innerHTML = '<button data-c="1">Oui</button><button data-c="0">Non</button>';
+      const setCall = ()=>cb.querySelectorAll("button").forEach(b=>
+        b.setAttribute("aria-pressed", (b.dataset.c === "1") === (p.canCall !== false) ? "true":"false"));
+      cb.querySelectorAll("button").forEach(b=>b.addEventListener("click", ()=>{
+        p.canCall = b.dataset.c === "1"; setCall();
+      }));
+      setCall();
+      fields.appendChild(cbL); fields.appendChild(cb);
+    }else{
+      const gcL = document.createElement("label");
+      gcL.textContent = "Chat ID du groupe Telegram (commence par -100)";
+      const gcI = document.createElement("input");
+      gcI.type = "text"; gcI.value = p.chatId || ""; gcI.id = "fChat";
+      fields.appendChild(gcL); fields.appendChild(gcI);
+
+      const mL = document.createElement("label");
+      mL.textContent = "Qui est dans le groupe (pour les visages)";
+      const box = document.createElement("div"); box.className = "members";
+      CONFIG.people.filter(q=>!isGroup(q) && q.id !== p.id).forEach(q=>{
+        const l = document.createElement("label");
+        const c = document.createElement("input");
+        c.type = "checkbox"; c.value = q.id;
+        c.checked = !!(p.members && p.members.includes(q.id));
+        l.appendChild(c); l.appendChild(document.createTextNode(q.name));
+        box.appendChild(l);
+      });
+      fields.appendChild(mL); fields.appendChild(box);
+    }
+
+    const cL = document.createElement("label"); cL.textContent = "Couleur";
+    const sw = document.createElement("div"); sw.className = "swatches";
+    SWATCHES.forEach(c=>{
+      const b = document.createElement("button");
+      b.className = "sw"; b.style.background = c;
+      b.setAttribute("aria-pressed", c === p.colour ? "true" : "false");
+      b.setAttribute("aria-label", "Couleur");
+      b.addEventListener("click", ()=>{
+        p.colour = c;
+        sw.querySelectorAll(".sw").forEach(x=>x.setAttribute("aria-pressed","false"));
+        b.setAttribute("aria-pressed","true");
+      });
+      sw.appendChild(b);
+    });
+    fields.appendChild(cL); fields.appendChild(sw);
+
+    const phL = document.createElement("label"); phL.textContent = "Photo (adresse ou data:image, facultatif)";
+    const phI = document.createElement("input");
+    phI.type = "text"; phI.value = p.photo || ""; phI.id = "fPhoto";
+    fields.appendChild(phL); fields.appendChild(phI);
+  }
+
+  paintTabs(); paintFields();
+
+  row.querySelector(".cancel").addEventListener("click", ()=>{ aFormWrap.innerHTML = ""; });
+  row.querySelector(".save").addEventListener("click", ()=>{
+    const name = document.getElementById("fName").value.trim();
+    if(!name){ alert("Il faut un nom."); return; }
+    p.name = name;
+    p.photo = document.getElementById("fPhoto").value.trim() || null;
+
+    p.chatId = (document.getElementById("fChat").value || "").trim();
+
+    if(mode === "person"){
+      const tel = document.getElementById("fTel").value.replace(/\s/g,"");
+      if(tel && !/^\+?\d{6,}$/.test(tel)){ alert("Numéro invalide."); return; }
+      p.numbers = tel ? [tel] : [];
+      delete p.members;
+      if(!p.transport) p.transport = "telegram";
+      if(p.transport === "telegram" && !p.chatId){ alert("Il faut un chat ID."); return; }
+      if(!p.numbers.length) p.canCall = false;
+    }else{
+      const ids = [...fields.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+      if(ids.length < 2){ alert("Un groupe demande au moins deux personnes."); return; }
+      if(!p.chatId){ alert("Il faut le chat ID du groupe."); return; }
+      p.members = ids; p.numbers = []; p.transport = "telegram";
+    }
+
+    if(editing) CONFIG.people[idx] = p; else CONFIG.people.push(p);
+    if(!inbox[p.id]) inbox[p.id] = [];
+    saveConfig(); renderAdmin();
+  });
+}
+
+/* ----------------------------- SMS ---------------------------
+   Android bridge in the shell:
+     Android.sendSms(JSON.stringify(numbers), text)   per recipient
+     Android.saveConfig(json) / Android.loadConfig()   SharedPreferences
+   Incoming text arrives through a BroadcastReceiver calling
+   deliver(); MMS pictures through deliverPhoto(). Nothing sends a
+   picture, because nothing offers to. On startup, read the phone's
+   own SMS store rather than keeping a second copy of the history. */
+/* One destination, one chat. A group is a real Telegram group with
+   its own chat id, so a message posted there is seen by everyone in
+   it and their replies come back to the same place. No fan-out, no
+   conversations that can only be spoken into. */
+function sendTo(p, text){
+  if(p.transport === "sms"){
+    if(window.Android && window.Android.sendSms) window.Android.sendSms(JSON.stringify(p.numbers), text);
+    return;
+  }
+  if(window.Android && window.Android.sendTelegram){
+    window.Android.sendTelegram(String(p.chatId), text);
+  }else{
+    TG.send(p.chatId, text);
+  }
+}
+
+function idForChat(chatId){
+  const p = CONFIG.people.find(q=>String(q.chatId) === String(chatId));
+  return p ? p.id : null;
+}
+
+/* Called by the Android poller for every incoming Telegram message.
+   `fromName` matters in a group, where the chat is not the speaker:
+   without it Karine's reply and Sophie's reply look identical. */
+window.deliverTo = function(chatId, fromName, text){
+  const id = idForChat(chatId); if(!id || !inbox[id]) return;
+  const now = Date.now();
+  const grp = isGroup(person(id));
+  splitLong(text).forEach((c,n)=>inbox[id].push({
+    text:c, mine:false, at:now+n, read:false, from: grp ? (fromName||"") : null
+  }));
+  saveHistory(); renderHome();
+  if(current === id && document.getElementById("contact").classList.contains("on")){
+    renderConversation(id);
+  }
+};
+
+window.deliverPhotoTo = function(chatId, fromName, dataUrl){
+  const id = idForChat(chatId); if(!id || !inbox[id]) return;
+  inbox[id].push({ photo:dataUrl, mine:false, at:Date.now(), read:false,
+                   from: isGroup(person(id)) ? (fromName||"") : null });
+  saveHistory(); renderHome();
+};
+
+/* Telegram history does not live on the phone the way SMS does, so
+   the app has to keep it. Android side writes it to a file. */
+function saveHistory(){ try{ writeKey("hist", JSON.stringify(inbox)); }catch(e){} }
+function loadHistory(){
+  try{ const raw = readKey("hist"); if(raw) Object.assign(inbox, JSON.parse(raw)); }catch(e){}
+}
+
+function idForNumber(num){
+  const p = CONFIG.people.find(q=>!isGroup(q) && q.numbers[0] === num);
+  return p ? p.id : null;
+}
+window.deliver = function(from, text){
+  const id = idForNumber(from); if(!id) return;
+  const now = Date.now();
+  splitLong(text).forEach((c,n)=>inbox[id].push({ text:c, mine:false, at:now+n, read:false }));
+  renderHome();
+  if(current === id && document.getElementById("contact").classList.contains("on")){
+    renderConversation(id);
+  }
+};
+window.deliverPhoto = function(from, dataUrl){
+  const id = idForNumber(from); if(!id) return;
+  inbox[id].push({ photo:dataUrl, mine:false, at:Date.now(), read:false });
+  renderHome();
+};
+
+/* The visible viewport, not the window: on Android the window
+   keeps its full height behind the keyboard, which is exactly how
+   the bottom button ends up underneath it. */
+const vv = window.visualViewport;
+function trackViewport(){
+  if(!vv) return;
+  document.body.style.height = vv.height + "px";
+  document.body.classList.toggle("kb", vv.height < window.innerHeight * 0.82);
+  requestAnimationFrame(()=>{
+    fitVisibleButtons();
+    if(document.getElementById("write").classList.contains("on") && current) paintQuote();
+  });
+}
+if(vv){
+  vv.addEventListener("resize", trackViewport);
+  vv.addEventListener("scroll", trackViewport);
+  trackViewport();
+}
+
+window.addEventListener("resize", ()=>{
+  fitVisibleButtons();
+  if(document.getElementById("contact").classList.contains("on") && current) renderConversation(current);
+  else if(document.getElementById("write").classList.contains("on") && current) paintQuote();
+});
+
+loadHistory();
+renderHome();
+requestAnimationFrame(fitVisibleButtons);
+</script>
+</body>
+</html>
